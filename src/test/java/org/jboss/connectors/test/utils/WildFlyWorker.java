@@ -24,19 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Manages a native WildFly/EAP server process for connector testing.
- *
- * <p>Lifecycle: extracts the distribution ZIP via {@link NativeServerExtractor},
- * starts the server with a port offset via {@link NativePortAllocator}, and provides
- * a Creaper {@link OnlineManagementClient} for Elytron and Undertow configuration.
- *
- * <p>Each test gets a clean server state — {@code standalone.xml} is restored
- * from backup and runtime data directories are deleted before startup.
- *
- * <p>Injected into tests by {@link org.jboss.connectors.test.base.ConnectorTestExtension}.
- *
- * @see NativeServerExtractor
- * @see NativePortAllocator
+ * Native WildFly worker for connector testing.
+ * Runs WildFly as a local OS process, no Docker.
  */
 public class WildFlyWorker {
 
@@ -100,11 +89,15 @@ public class WildFlyWorker {
     }
 
     public String getHttpUrl() {
-        return "http://localhost:" + NativePortAllocator.resolveHttpPort(name);
+        return "http://localhost:" + NativePortAllocator.httpPort(name);
     }
 
     public String getManagementUrl() {
-        return "http://localhost:" + NativePortAllocator.resolveManagementPort(name);
+        return "http://localhost:" + NativePortAllocator.managementPort(name);
+    }
+
+    public int getManagementPort() {
+        return NativePortAllocator.managementPort(name);
     }
 
     public Path getServerHome() {
@@ -116,7 +109,7 @@ public class WildFlyWorker {
     public OnlineManagementClient getManagementClient() throws IOException {
         if (managementClient == null) {
             managementClient = ManagementClientFactory.create(
-                    "localhost", NativePortAllocator.resolveManagementPort(name));
+                    "localhost", NativePortAllocator.managementPort(name));
         }
         return managementClient;
     }
@@ -250,7 +243,7 @@ public class WildFlyWorker {
         cmd.add("-bmanagement");
         cmd.add("0.0.0.0");
         cmd.add("-Djboss.node.name=" + name);
-        cmd.add("-Djboss.socket.binding.port-offset=" + NativePortAllocator.resolvePortOffset(name));
+        cmd.add("-Djboss.socket.binding.port-offset=" + NativePortAllocator.offset(name));
 
         return cmd;
     }

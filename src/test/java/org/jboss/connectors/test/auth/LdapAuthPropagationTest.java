@@ -6,6 +6,7 @@ import org.jboss.connectors.test.proxy.AjpProxy;
 import org.jboss.connectors.test.utils.EmbeddedLdapServer;
 import org.jboss.connectors.test.utils.HttpClient;
 import org.jboss.connectors.test.utils.HttpClient.HttpResponse;
+import org.jboss.connectors.test.utils.TestTimeouts;
 import org.jboss.connectors.test.utils.WildFlyWorker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,11 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 
+import static java.time.Duration.ofSeconds;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.jboss.connectors.test.auth.AuthTestUtils.awaitAjpAvailable;
-import static org.jboss.connectors.test.auth.AuthTestUtils.basicAuthHeaders;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests REMOTE_USER authentication propagation with LDAP-backed role resolution.
@@ -35,11 +38,6 @@ public class LdapAuthPropagationTest {
 
     private static final Logger log = LoggerFactory.getLogger(LdapAuthPropagationTest.class);
 
-    /**
-     * Verifies that a user whose LDAP group membership grants the correct role
-     * ({@code gooduser}) can access the secured servlet through the AJP proxy.
-     * Expects HTTP 200 with {@code user=testuser} in the response body.
-     */
     @Test
     public void testAuthenticatedUserCanAccessSecuredServlet(WildFlyWorker worker,
                                                              HttpClient httpClient) throws Exception {
@@ -49,7 +47,7 @@ public class LdapAuthPropagationTest {
         try {
             LdapAuthConfigurator configurator = new LdapAuthConfigurator();
             configurator.configureElytron(worker, ldapServer.getPort());
-            int ajpPort = AjpListenerSetup.addAjpListener(worker);
+            int ajpPort = configurator.addAjpListener(worker);
 
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
@@ -76,10 +74,6 @@ public class LdapAuthPropagationTest {
         }
     }
 
-    /**
-     * Verifies that a request without REMOTE_USER (proxy configured without auth)
-     * is rejected by the Elytron EXTERNAL mechanism. Expects HTTP 403.
-     */
     @Test
     public void testNoRemoteUserIsRejected(WildFlyWorker worker,
                                             HttpClient httpClient) throws Exception {
@@ -89,7 +83,7 @@ public class LdapAuthPropagationTest {
         try {
             LdapAuthConfigurator configurator = new LdapAuthConfigurator();
             configurator.configureElytron(worker, ldapServer.getPort());
-            int ajpPort = AjpListenerSetup.addAjpListener(worker);
+            int ajpPort = configurator.addAjpListener(worker);
 
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
@@ -114,10 +108,6 @@ public class LdapAuthPropagationTest {
         }
     }
 
-    /**
-     * Verifies that a user whose LDAP group membership grants the wrong role
-     * ({@code badrole} instead of {@code gooduser}) is rejected. Expects HTTP 403.
-     */
     @Test
     public void testUnauthorizedUserIsRejected(WildFlyWorker worker,
                                                 HttpClient httpClient) throws Exception {
@@ -127,7 +117,7 @@ public class LdapAuthPropagationTest {
         try {
             LdapAuthConfigurator configurator = new LdapAuthConfigurator();
             configurator.configureElytron(worker, ldapServer.getPort());
-            int ajpPort = AjpListenerSetup.addAjpListener(worker);
+            int ajpPort = configurator.addAjpListener(worker);
 
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
@@ -153,4 +143,23 @@ public class LdapAuthPropagationTest {
         }
     }
 
+    private void awaitAjpAvailable(HttpClient httpClient, String url, Map<String, String> headers) {
+        await().atMost(TestTimeouts.AJP_AVAILABLE)
+                .pollInterval(ofSeconds(2))
+                .ignoreExceptions()
+                .untilAsserted(() -> {
+                    HttpResponse response = headers != null
+                            ? httpClient.get(url, headers) : httpClient.get(url);
+                    assertThat(response.getStatusCode()).isLessThan(500);
+                });
+        log.info("AJP proxy responding at {}", url);
+    }
+
+    private static Map<String, String> basicAuthHeaders(String username, String password) {
+        String credentials = Base64.getEncoder().encodeToString(
+                (username + ":" + password).getBytes());
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Authorization", "Basic " + credentials);
+        return headers;
+    }
 }

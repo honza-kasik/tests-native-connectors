@@ -11,13 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * HTTP client for making requests through the AJP proxy and verifying responses.
- * Wraps OkHttp with {@code Connection: close} headers to ensure each request
- * gets a fresh connection for accurate proxy testing.
- *
- * <p>Injected into tests by {@link org.jboss.connectors.test.base.ConnectorTestExtension}.
- */
 public class HttpClient {
 
     private static final Logger log = LoggerFactory.getLogger(HttpClient.class);
@@ -32,12 +25,10 @@ public class HttpClient {
                 .build();
     }
 
-    /** Perform a GET request and return the response. */
     public HttpResponse get(String url) throws IOException {
         return get(url, new HashMap<>());
     }
 
-    /** Perform a GET request with custom headers. */
     public HttpResponse get(String url, Map<String, String> headers) throws IOException {
         headers.putIfAbsent("Connection", "close");
         Request.Builder builder = new Request.Builder().url(url);
@@ -53,7 +44,6 @@ public class HttpClient {
         }
     }
 
-    /** Perform a GET request with a session cookie (for sticky session testing). */
     public HttpResponse getWithSession(String url, String sessionCookie) throws IOException {
         Map<String, String> headers = new HashMap<>();
         headers.put("Cookie", sessionCookie);
@@ -81,7 +71,6 @@ public class HttpClient {
         return headers;
     }
 
-    /** Response wrapper containing status code, body, cookies, and headers. */
     public static class HttpResponse {
         private final int statusCode;
         private final String body;
