@@ -1,0 +1,272 @@
+= Native Connectors Test Suite
+:author: Jan Kašík
+:toc: left
+
+== Overview
+
+Automated test coverage for native AJP connectors with WildFly/EAP, validating
+authentication propagation via the Elytron EXTERNAL mechanism.
+
+Connectors under test:
+
+[cols="1,1,1,1"]
+|===
+| Connector | Platform | Source | Notes
+
+| mod_proxy_ajp
+| Linux (httpd)
+| httpd built-in
+| Default AJP proxy module
+
+| mod_jk
+| Linux (httpd)
+| JBCS
+| Not available on RHEL 10 (link:https://docs.redhat.com/en/documentation/red_hat_jboss_core_services/2.4.62/html-single/apache_http_server_connectors_and_load_balancing_guide/index[JBCS docs])
+
+| isapi_redirect
+| Windows (IIS)
+| JBCS
+| IIS ISAPI filter, uses `workers.properties`
+|===
+
+== Test coverage
+
+=== Test matrix
+
+Tests run across three dimensions: *connector*, *realm type*, and *test case*.
+
+[cols="1,1,1,1"]
+|===
+| Connector | Realm | Platform | CI job
+
+| mod_proxy_ajp
+| filesystem, LDAP
+| RHEL 8, 9, 10
+| `native-connectors-testsuite`
+
+| mod_jk
+| filesystem, LDAP
+| RHEL 8, 9 (not RHEL 10)
+| `native-connectors-testsuite`
+
+| isapi_redirect
+| filesystem, LDAP
+| Windows Server 2019, 2022
+| `native-connectors-testsuite-windows`
+|===
+
+=== Test cases
+
+Each connector × realm combination validates three scenarios:
+
+[cols="1,2,1"]
+|===
+| Test case | Description | Expected
+
+| Authenticated access
+| Proxy authenticates user (Basic auth / IIS auth), AJP carries `REMOTE_USER`,
+  Elytron EXTERNAL mechanism resolves identity and role from realm
+| HTTP 200, `user=testuser` in response
+
+| No authentication
+| Proxy forwards request without authentication, no `REMOTE_USER` in AJP
+| HTTP 403
+
+| Wrong role
+| Proxy authenticates user who exists in realm but lacks the required role (`gooduser`)
+| HTTP 403
+|===
+
+=== Realm types
+
+[cols="1,3"]
+|===
+| Realm | Purpose
+
+| `filesystem-realm`
+| Hardcoded user/role entries via Creaper. Validates the basic Elytron EXTERNAL path.
+  Test class: `AjpAuthPropagationTest`
+
+| `ldap-realm`
+| Roles resolved from LDAP group membership (`groupOfNames` with `member` attribute).
+  Uses an embedded in-memory LDAP server (UnboundID). Validates the typical Active Directory
+  integration path where per-user Elytron config is impractical.
+  Test class: `LdapAuthPropagationTest`
+|===
+
+=== Elytron configuration
+
+The EXTERNAL mechanism chain:
+
+. `http-authentication-factory` with `mechanism-name=EXTERNAL`
+. `security-domain` referencing a realm
+. Realm: `filesystem-realm` (per-user entries) or `ldap-realm` (directory server lookup)
+. `simple-role-decoder` on `Roles` attribute
+. `application-security-domain` wired to Undertow
+. `web.xml` with `<auth-method>EXTERNAL</auth-method>`
+
+The `ldap-realm` uses `identity-mapping` with `attribute-mapping` to resolve roles:
+
+* `rdn-identifier=uid` under `ou=People,dc=test,dc=local`
+* Group search: `(member=\{1})` under `ou=Groups,dc=test,dc=local`
+* `from=cn` (group name) mapped `to=Roles`
+
+== Running the tests
+
+=== System properties
+
+[cols="1,1,3"]
+|===
+| Property | Required | Description
+
+| `wildfly.zip.path`
+| Yes
+| Path to WildFly/EAP distribution ZIP
+
+| `httpd.home`
+| No
+| Path to JBCS httpd installation (e.g. `.../jbcs-httpd24-2.4/httpd`).
+  When set, uses JBCS httpd binary and modules instead of system httpd.
+
+| `mod.jk.path`
+| No
+| Path to `mod_jk.so`. When set, tests use mod_jk instead of mod_proxy_ajp.
+
+| `isapi.redirect.dll.path`
+| Windows only
+| Path to `isapi_redirect.dll` from JBCS connectors ZIP
+|===
+
+=== Linux — mod_proxy_ajp (default)
+
+[source,bash]
+----
+mvn test -Dwildfly.zip.path=/path/to/wildfly.zip
+----
+
+With JBCS httpd (no system httpd required):
+
+[source,bash]
+----
+mvn test -Dwildfly.zip.path=/path/to/wildfly.zip \
+         -Dhttpd.home=/path/to/jbcs-httpd24-2.4/httpd
+----
+
+=== Linux — mod_jk
+
+[source,bash]
+----
+mvn test -Dwildfly.zip.path=/path/to/wildfly.zip \
+         -Dhttpd.home=/path/to/jbcs-httpd24-2.4/httpd \
+         -Dmod.jk.path=/path/to/jbcs-httpd24-2.4/httpd/modules/mod_jk.so
+----
+
+=== Windows — isapi_redirect
+
+[source,cmd]
+----
+mvn test -Dwildfly.zip.path=C:\path\to\wildfly.zip ^
+         -Disapi.redirect.dll.path=C:\path\to\isapi_redirect.dll
+----
+
+IIS features must be installed:
+
+[source,powershell]
+----
+Install-WindowsFeature Web-Server, Web-Basic-Auth, Web-ISAPI-Filter, Web-ISAPI-Ext
+----
+
+== Architecture
+
+=== Proxy implementations
+
+[cols="1,1,2"]
+|===
+| Class | Connector | How it works
+
+| `HttpdAjpProxy`
+| mod_proxy_ajp
+| Generates `httpd.conf` with `ProxyPass ajp://` directives + Basic auth
+
+| `HttpdModJkProxy`
+| mod_jk
+| Generates `httpd.conf` with `LoadModule jk_module` + `workers.properties` + `JkMount`
+
+| `IISIsapiProxy`
+| isapi_redirect
+| Configures IIS via AppCmd: ISAPI filter, Basic auth, registry keys for `workers.properties`
+|===
+
+`AjpProxy.create()` auto-selects the implementation based on platform and system properties.
+
+`AbstractHttpdProxy` provides shared httpd process management, binary discovery,
+`LD_LIBRARY_PATH` for JBCS shared libraries, and Basic auth configuration.
+
+=== Test infrastructure
+
+[cols="1,2"]
+|===
+| Component | Description
+
+| `ConnectorTestExtension`
+| JUnit 5 extension. Starts/stops a WildFly worker per test method, injects `WildFlyWorker` and `HttpClient`.
+
+| `AjpAuthConfigurator`
+| Configures Elytron EXTERNAL + filesystem-realm via Creaper management operations.
+
+| `LdapAuthConfigurator`
+| Configures Elytron EXTERNAL + ldap-realm + dir-context via Creaper.
+
+| `EmbeddedLdapServer`
+| In-memory LDAP server (UnboundID) with users in `ou=People` and role groups in `ou=Groups`.
+
+| `SecuredAppBuilder`
+| Builds `secured.war` (ShrinkWrap) with EXTERNAL auth-method and `gooduser` role constraint.
+
+| `WildFlyWorker`
+| Manages a native WildFly process: ZIP extraction, startup, management client, deployment.
+
+| `NativePortAllocator`
+| Static port offsets for workers sharing the host network (HTTP 8180, management 10090, etc.)
+|===
+
+=== Test flow
+
+. `ConnectorTestExtension` extracts WildFly ZIP and starts a native worker process
+. Test configures Elytron (EXTERNAL mechanism + realm) via Creaper
+. Test adds an AJP listener (socket binding + Undertow AJP listener)
+. Test deploys `secured.war`
+. Test creates and starts an `AjpProxy` (httpd or IIS)
+. Proxy authenticates user, sets `REMOTE_USER`, forwards via AJP
+. Elytron EXTERNAL mechanism picks up `REMOTE_USER`, resolves roles from realm
+. Assertions verify HTTP status code and response body
+. Proxy and WildFly worker are stopped and cleaned up
+
+== Technical notes
+
+=== AJP REMOTE_USER protocol
+
+* `SetEnv AJP_REMOTE_USER` does NOT set the AJP protocol's `remote_user` field — it creates a request attribute
+* The EXTERNAL mechanism reads the AJP protocol field, which is only set when the proxy actually authenticates the user (e.g. `mod_auth_basic`, IIS Basic/Windows auth)
+* For isapi_redirect, IIS authentication sets `REMOTE_USER` natively
+
+=== IIS + isapi_redirect setup
+
+Key requirements discovered during testing:
+
+* DefaultAppPool must use *Classic* pipeline mode (ISAPI filters don't work in Integrated mode)
+* Handler `accessPolicy` must include *Execute* (default is Read,Script — DLL gets served as download without it)
+* Config sections (`handlers`, `basicAuthentication`, `anonymousAuthentication`) must be *unlocked* before site-level changes
+* Registry keys required at `HKLM\SOFTWARE\Apache Software Foundation\Jakarta Isapi Redirector\1.0`
+* Virtual directory `/jakarta` required for the ISAPI extension URI
+
+=== mod_jk platform support
+
+mod_jk is available from JBCS on RHEL 7, 8, 9, and Windows. It has been dropped from RHEL 10.
+See link:https://docs.redhat.com/en/documentation/red_hat_jboss_core_services/2.4.62/html-single/apache_http_server_connectors_and_load_balancing_guide/index[JBCS Apache HTTP Server Connectors and Load Balancing Guide].
+
+=== References
+
+* link:https://github.com/wildfly/wildfly-proposals/blob/main/elytron/ELY-1921-http-external-mechanism.adoc[Elytron EXTERNAL mechanism proposal]
+* link:https://wildfly-security.github.io/wildfly-elytron/blog/http-external-mechanism/[Elytron EXTERNAL mechanism blog post]
+* link:https://docs.redhat.com/en/documentation/red_hat_jboss_core_services/2.4.62/html-single/apache_http_server_connectors_and_load_balancing_guide/index[JBCS Connectors and Load Balancing Guide]
