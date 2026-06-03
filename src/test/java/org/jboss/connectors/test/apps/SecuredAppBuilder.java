@@ -17,6 +17,12 @@ import java.net.URL;
  */
 public class SecuredAppBuilder {
 
+    /**
+     * Build {@code secured.war} containing the {@link SecuredServlet} with EXTERNAL auth,
+     * and write it to the system temp directory.
+     *
+     * @return the WAR file (deleted on JVM exit)
+     */
     public static File createSecuredApp() {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         URL webXml = cl.getResource("apps/secured/web.xml");

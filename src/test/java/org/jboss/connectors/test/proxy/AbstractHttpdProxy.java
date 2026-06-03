@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ abstract class AbstractHttpdProxy implements AjpProxy {
 
     protected abstract StringBuilder buildBaseConfig(String workerHost, int workerAjpPort);
 
+    /** {@inheritDoc} */
     @Override
     public void configureAuth(String username, String password, String workerHost, int workerAjpPort) throws Exception {
         prepareWorkDir();
@@ -55,6 +57,7 @@ abstract class AbstractHttpdProxy implements AjpProxy {
                 getClass().getSimpleName(), username, workerHost, workerAjpPort);
     }
 
+    /** {@inheritDoc} */
     @Override
     public void configureNoAuth(String workerHost, int workerAjpPort) throws Exception {
         prepareWorkDir();
@@ -65,6 +68,7 @@ abstract class AbstractHttpdProxy implements AjpProxy {
                 getClass().getSimpleName(), workerHost, workerAjpPort);
     }
 
+    /** Start the httpd process in foreground mode using the generated configuration. */
     @Override
     public void start() throws Exception {
         if (processManager != null && processManager.isRunning()) {
@@ -102,6 +106,7 @@ abstract class AbstractHttpdProxy implements AjpProxy {
         log.info("{} started on port {}", getClass().getSimpleName(), listenPort);
     }
 
+    /** Stop the httpd process. */
     @Override
     public void stop() {
         if (processManager != null) {
@@ -114,6 +119,32 @@ abstract class AbstractHttpdProxy implements AjpProxy {
     @Override
     public String getHttpUrl() {
         return "http://localhost:" + listenPort;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void archiveConfigs(Path targetDir) throws IOException {
+        Files.createDirectories(targetDir);
+        if (confDir != null) {
+            try (var files = Files.list(confDir)) {
+                files.forEach(src -> {
+                    try {
+                        Files.copy(src, targetDir.resolve(src.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        log.debug("Failed to archive {}: {}", src, e.getMessage());
+                    }
+                });
+            }
+        }
+        copyIfExists(workDir.resolve("error.log"), targetDir.resolve("error.log"));
+        copyIfExists(workDir.resolve("mod_jk.log"), targetDir.resolve("mod_jk.log"));
+        log.info("Proxy configs archived to {}", targetDir);
+    }
+
+    private static void copyIfExists(Path src, Path dest) throws IOException {
+        if (Files.exists(src)) {
+            Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     protected StringBuilder buildCommonConfig() {

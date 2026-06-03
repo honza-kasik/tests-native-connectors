@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * IIS with isapi_redirect as an AJP reverse proxy.
@@ -47,6 +48,7 @@ public class IISIsapiProxy implements AjpProxy {
         this.isapiDir = Path.of("C:\\isapi");
     }
 
+    /** {@inheritDoc} */
     @Override
     public void configureAuth(String username, String password, String workerHost, int workerAjpPort) throws Exception {
         this.testUsername = username;
@@ -58,6 +60,7 @@ public class IISIsapiProxy implements AjpProxy {
         log.info("Configured IIS ISAPI proxy with Windows auth for user '{}' -> {}:{}", username, workerHost, workerAjpPort);
     }
 
+    /** {@inheritDoc} */
     @Override
     public void configureNoAuth(String workerHost, int workerAjpPort) throws Exception {
         prepareIsapiDir(workerHost, workerAjpPort);
@@ -66,6 +69,7 @@ public class IISIsapiProxy implements AjpProxy {
         log.info("Configured IIS ISAPI proxy without auth -> {}:{}", workerHost, workerAjpPort);
     }
 
+    /** Restart IIS to activate the ISAPI filter configuration. */
     @Override
     public void start() throws Exception {
         if (started) {
@@ -77,16 +81,11 @@ public class IISIsapiProxy implements AjpProxy {
         log.info("IIS ISAPI proxy started on port 80");
     }
 
+    /** Clean up IIS configuration, remove the test user, and restart IIS. */
     @Override
     public void stop() {
         if (!started) {
             return;
-        }
-
-        try {
-            archiveConfigs();
-        } catch (Exception e) {
-            log.warn("Failed to archive IIS configs: {}", e.getMessage());
         }
 
         try {
@@ -107,7 +106,7 @@ public class IISIsapiProxy implements AjpProxy {
     private void prepareIsapiDir(String workerHost, int workerAjpPort) throws IOException {
         Files.createDirectories(isapiDir);
         Files.copy(dllPath, isapiDir.resolve("isapi_redirect.dll"),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                StandardCopyOption.REPLACE_EXISTING);
 
         Files.writeString(isapiDir.resolve("workers.properties"),
                 "worker.list=worker1\n" +
@@ -177,25 +176,24 @@ public class IISIsapiProxy implements AjpProxy {
         }
     }
 
-    private void archiveConfigs() throws IOException {
-        Path archiveDir = Path.of("target", "iis-config");
-        Files.createDirectories(archiveDir);
+    /** {@inheritDoc} */
+    @Override
+    public void archiveConfigs(Path targetDir) throws Exception {
+        Files.createDirectories(targetDir);
         for (String name : new String[]{"workers.properties", "uriworkermap.properties",
                 "isapi_redirect.properties", "isapi_redirect.log"}) {
             Path src = isapiDir.resolve(name);
             if (Files.exists(src)) {
-                Files.copy(src, archiveDir.resolve(name),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(src, targetDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        // Export IIS site config
         try {
             CommandResult result = exec(APPCMD, "list", "config", "Default Web Site");
-            Files.writeString(archiveDir.resolve("iis-site-config.xml"), result.getStdout());
+            Files.writeString(targetDir.resolve("iis-site-config.xml"), result.getStdout());
         } catch (Exception e) {
             log.debug("Could not export IIS config: {}", e.getMessage());
         }
-        log.info("IIS configs archived to {}", archiveDir);
+        log.info("IIS configs archived to {}", targetDir);
     }
 
     private void cleanup() throws Exception {

@@ -1,5 +1,8 @@
 package org.jboss.connectors.test.proxy;
 
+import java.nio.file.Path;
+import java.util.Locale;
+
 /**
  * Abstraction for an AJP reverse proxy fronting a WildFly worker.
  * Implementations manage the proxy process lifecycle and configuration.
@@ -17,13 +20,13 @@ public interface AjpProxy {
      * </ul>
      */
     static AjpProxy create() {
-        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
             String dllPath = System.getProperty("isapi.redirect.dll.path");
             if (dllPath == null) {
                 throw new IllegalStateException(
                         "Set -Disapi.redirect.dll.path to the isapi_redirect.dll location");
             }
-            return new IISIsapiProxy(java.nio.file.Path.of(dllPath));
+            return new IISIsapiProxy(Path.of(dllPath));
         }
         if (System.getProperty("mod.jk.path") != null) {
             return new HttpdModJkProxy();
@@ -55,4 +58,7 @@ public interface AjpProxy {
     void configureNoAuth(String workerHost, int workerAjpPort) throws Exception;
 
     String getHttpUrl();
+
+    /** Archive proxy configuration files to the given directory for post-test debugging. */
+    void archiveConfigs(Path targetDir) throws Exception;
 }

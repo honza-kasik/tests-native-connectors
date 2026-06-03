@@ -42,6 +42,7 @@ public class LdapAuthPropagationTest {
      */
     @Test
     public void testAuthenticatedUserCanAccessSecuredServlet(WildFlyWorker worker,
+                                                             AjpProxy proxy,
                                                              HttpClient httpClient) throws Exception {
         EmbeddedLdapServer ldapServer = new EmbeddedLdapServer();
         ldapServer.start();
@@ -54,23 +55,18 @@ public class LdapAuthPropagationTest {
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
 
-            AjpProxy proxy = AjpProxy.create();
             proxy.configureAuth("testuser", "Password1!", "localhost", ajpPort);
             proxy.start();
 
-            try {
-                String url = proxy.getHttpUrl() + "/secured/secured";
-                Map<String, String> authHeaders = basicAuthHeaders("testuser", "Password1!");
-                awaitAjpAvailable(httpClient, url, authHeaders);
+            String url = proxy.getHttpUrl() + "/secured/secured";
+            Map<String, String> authHeaders = basicAuthHeaders("testuser", "Password1!");
+            awaitAjpAvailable(httpClient, url, authHeaders);
 
-                HttpResponse response = httpClient.get(url, authHeaders);
+            HttpResponse response = httpClient.get(url, authHeaders);
 
-                log.info("Response: status={}, body={}", response.getStatusCode(), response.getBody());
-                assertThat(response.getStatusCode()).isEqualTo(200);
-                assertThat(response.getBody()).contains("user=testuser");
-            } finally {
-                proxy.stop();
-            }
+            log.info("Response: status={}, body={}", response.getStatusCode(), response.getBody());
+            assertThat(response.getStatusCode()).isEqualTo(200);
+            assertThat(response.getBody()).contains("user=testuser");
         } finally {
             ldapServer.stop();
         }
@@ -82,6 +78,7 @@ public class LdapAuthPropagationTest {
      */
     @Test
     public void testNoRemoteUserIsRejected(WildFlyWorker worker,
+                                            AjpProxy proxy,
                                             HttpClient httpClient) throws Exception {
         EmbeddedLdapServer ldapServer = new EmbeddedLdapServer();
         ldapServer.start();
@@ -94,21 +91,16 @@ public class LdapAuthPropagationTest {
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
 
-            AjpProxy proxy = AjpProxy.create();
             proxy.configureNoAuth("localhost", ajpPort);
             proxy.start();
 
-            try {
-                String url = proxy.getHttpUrl() + "/secured/secured";
-                awaitAjpAvailable(httpClient, url, null);
+            String url = proxy.getHttpUrl() + "/secured/secured";
+            awaitAjpAvailable(httpClient, url, null);
 
-                HttpResponse response = httpClient.get(url);
+            HttpResponse response = httpClient.get(url);
 
-                log.info("Response (no REMOTE_USER): status={}", response.getStatusCode());
-                assertThat(response.getStatusCode()).isEqualTo(403);
-            } finally {
-                proxy.stop();
-            }
+            log.info("Response (no REMOTE_USER): status={}", response.getStatusCode());
+            assertThat(response.getStatusCode()).isEqualTo(403);
         } finally {
             ldapServer.stop();
         }
@@ -120,6 +112,7 @@ public class LdapAuthPropagationTest {
      */
     @Test
     public void testUnauthorizedUserIsRejected(WildFlyWorker worker,
+                                                AjpProxy proxy,
                                                 HttpClient httpClient) throws Exception {
         EmbeddedLdapServer ldapServer = new EmbeddedLdapServer();
         ldapServer.start();
@@ -132,22 +125,17 @@ public class LdapAuthPropagationTest {
             File securedWar = SecuredAppBuilder.createSecuredApp();
             worker.deploy(securedWar);
 
-            AjpProxy proxy = AjpProxy.create();
             proxy.configureAuth("baduser", "Password1!", "localhost", ajpPort);
             proxy.start();
 
-            try {
-                String url = proxy.getHttpUrl() + "/secured/secured";
-                Map<String, String> authHeaders = basicAuthHeaders("baduser", "Password1!");
-                awaitAjpAvailable(httpClient, url, authHeaders);
+            String url = proxy.getHttpUrl() + "/secured/secured";
+            Map<String, String> authHeaders = basicAuthHeaders("baduser", "Password1!");
+            awaitAjpAvailable(httpClient, url, authHeaders);
 
-                HttpResponse response = httpClient.get(url, authHeaders);
+            HttpResponse response = httpClient.get(url, authHeaders);
 
-                log.info("Response (wrong role): status={}", response.getStatusCode());
-                assertThat(response.getStatusCode()).isEqualTo(403);
-            } finally {
-                proxy.stop();
-            }
+            log.info("Response (wrong role): status={}", response.getStatusCode());
+            assertThat(response.getStatusCode()).isEqualTo(403);
         } finally {
             ldapServer.stop();
         }

@@ -17,7 +17,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,11 +53,13 @@ public class WildFlyWorker {
         this.name = name;
     }
 
+    /** Set custom JVM options for the server process. */
     public WildFlyWorker withJavaOpts(String javaOpts) {
         this.javaOpts = javaOpts;
         return this;
     }
 
+    /** Extract the distribution, reset server state, and start the WildFly process. */
     public void start() {
         try {
             serverHome = NativeServerExtractor.extract(name);
@@ -82,6 +83,7 @@ public class WildFlyWorker {
         }
     }
 
+    /** Close the management client and stop the server process. */
     public void stop() {
         closeManagementClient();
         if (processManager != null) {
@@ -101,6 +103,18 @@ public class WildFlyWorker {
 
     public String getHttpUrl() {
         return "http://localhost:" + NativePortAllocator.resolveHttpPort(name);
+    }
+
+    /** Copy standalone.xml to the given directory for post-test debugging. */
+    public void archiveConfigs(Path targetDir) throws IOException {
+        if (serverHome == null) {
+            return;
+        }
+        Files.createDirectories(targetDir);
+        Path standaloneXml = serverHome.resolve("standalone/configuration/standalone.xml");
+        if (Files.exists(standaloneXml)) {
+            Files.copy(standaloneXml, targetDir.resolve("standalone.xml"), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     public String getManagementUrl() {
@@ -129,6 +143,7 @@ public class WildFlyWorker {
         return new Administration(getManagementClient());
     }
 
+    /** Trigger a server reload via the management API and wait until the server is running again. */
     public void reload() throws Exception {
         log.info("Reloading worker '{}'", name);
         if (managementClient != null) {
@@ -157,17 +172,20 @@ public class WildFlyWorker {
 
     // -- Deployment --
 
+    /** Deploy the given archive (WAR/EAR) to the server via the management client. */
     public void deploy(File deploymentFile) throws Exception {
         log.info("Deploying {} to worker '{}'", deploymentFile.getName(), name);
         getManagementClient().apply(new Deploy.Builder(deploymentFile).build());
         log.info("Deployment {} succeeded on worker '{}'", deploymentFile.getName(), name);
     }
 
+    /** Undeploy the named deployment from the server. */
     public void undeploy(String deploymentName) throws Exception {
         log.info("Undeploying {} from worker '{}'", deploymentName, name);
         getManagementClient().apply(new Undeploy.Builder(deploymentName).build());
     }
 
+    /** Check whether the named deployment exists and is enabled on the server. */
     public boolean isDeployed(String deploymentName) throws Exception {
         Operations ops = getOperations();
         Address deploymentAddress = Address.deployment(deploymentName);
@@ -181,10 +199,17 @@ public class WildFlyWorker {
 
     // -- Command execution and file ops --
 
+    /** Execute a command in the server home directory and return the result. */
     public CommandResult execCommand(String... command) throws Exception {
         return NativeProcessManager.execCommand(serverHome, command);
     }
 
+    /**
+     * Copy a classpath resource into the server directory.
+     *
+     * @param classpathResource resource path on the classpath
+     * @param destPath destination path, resolved relative to server home if not absolute
+     */
     public void copyClasspathResource(String classpathResource, String destPath) {
         try {
             Path dest = Path.of(destPath);
@@ -207,6 +232,7 @@ public class WildFlyWorker {
         }
     }
 
+    /** Read a file as a string, resolving relative paths against the server home. */
     public String readFile(String path) throws Exception {
         Path filePath = Path.of(path);
         if (!filePath.isAbsolute()) {
@@ -215,6 +241,7 @@ public class WildFlyWorker {
         return Files.readString(filePath);
     }
 
+    /** Return the server log contents, falling back to the process output log if the log file does not exist. */
     public String getServerLog() throws Exception {
         Path logPath = serverHome.resolve("standalone/log/server.log");
         if (Files.exists(logPath)) {

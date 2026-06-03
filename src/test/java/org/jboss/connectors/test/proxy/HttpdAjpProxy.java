@@ -7,10 +7,12 @@ import org.jboss.connectors.test.utils.NativePortAllocator;
  */
 public class HttpdAjpProxy extends AbstractHttpdProxy {
 
+    /** Create a mod_proxy_ajp proxy listening on the default httpd port. */
     public HttpdAjpProxy() {
         this(NativePortAllocator.HTTPD_PORT);
     }
 
+    /** Create a mod_proxy_ajp proxy listening on the specified port. */
     public HttpdAjpProxy(int listenPort) {
         super(listenPort, "httpd-proxy");
     }
