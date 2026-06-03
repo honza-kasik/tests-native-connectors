@@ -48,6 +48,13 @@ public final class NativeServerExtractor {
     private NativeServerExtractor() {
     }
 
+    /**
+     * Extract the WildFly/EAP distribution ZIP for the named instance.
+     * Resolves the ZIP path from system property, environment variable, or auto-detection.
+     *
+     * @param instanceName unique name for this server instance (used as the extraction subdirectory)
+     * @return the server home directory
+     */
     public static Path extract(String instanceName) {
         Path zipPath = getWildFlyZipPath();
         if (zipPath == null || !zipPath.toFile().exists()) {
@@ -58,6 +65,15 @@ public final class NativeServerExtractor {
         return extractZip(zipPath, instanceName);
     }
 
+    /**
+     * Extract the given ZIP to a per-instance directory, reusing an existing extraction if present.
+     * Post-extraction steps include making shell scripts executable, adding a management user,
+     * and backing up the original {@code standalone.xml}.
+     *
+     * @param zipPath       path to the distribution ZIP
+     * @param instanceName  unique name for this server instance
+     * @return the server home directory inside the extraction
+     */
     public static Path extractZip(Path zipPath, String instanceName) {
         Path instanceDir = NATIVE_SERVERS_DIR.resolve(instanceName);
         String rootDir = detectZipRootDir(zipPath.toFile());

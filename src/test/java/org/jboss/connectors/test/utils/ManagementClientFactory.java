@@ -15,6 +15,10 @@ import java.io.IOException;
  */
 public class ManagementClientFactory {
 
+    /**
+     * Create a Creaper management client connected to the given host and port
+     * using the default {@code admin/admin} credentials.
+     */
     public static OnlineManagementClient create(String host, int port) throws IOException {
         return ManagementClient.online(
             OnlineOptions.standalone()

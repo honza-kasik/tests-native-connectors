@@ -49,6 +49,7 @@ public class EmbeddedLdapServer {
         this.port = port;
     }
 
+    /** Start the in-memory LDAP server and populate it with test users and groups. */
     public void start() throws Exception {
         InMemoryDirectoryServerConfig config = new InMemoryDirectoryServerConfig(BASE_DN);
         config.addAdditionalBindCredentials(BIND_DN, BIND_PASSWORD);
@@ -61,6 +62,7 @@ public class EmbeddedLdapServer {
         log.info("Embedded LDAP server started on port {}", getPort());
     }
 
+    /** Shut down the in-memory LDAP server. */
     public void stop() {
         if (server != null) {
             server.shutDown(true);
@@ -68,6 +70,7 @@ public class EmbeddedLdapServer {
         }
     }
 
+    /** Return the port the LDAP server is listening on (OS-assigned if constructed with port 0). */
     public int getPort() {
         return server != null ? server.getListenPort() : port;
     }
