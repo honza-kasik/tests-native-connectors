@@ -68,6 +68,7 @@ public class NativeProcessManager {
         this.outputLog = workDir.resolve("process-output.log");
     }
 
+    /** Start the native process and register it for shutdown-hook cleanup. */
     public void start() throws IOException {
         if (process != null && process.isAlive()) {
             throw new IllegalStateException("Process '" + name + "' is already running (pid "
@@ -87,6 +88,13 @@ public class NativeProcessManager {
         log.info("Process '{}' started (pid {}), output -> {}", name, process.pid(), outputLog);
     }
 
+    /**
+     * Poll the process output log until the given pattern appears or the timeout expires.
+     *
+     * @param pattern  the string to look for in the output log (e.g. a WildFly boot marker)
+     * @param timeout  maximum time to wait
+     * @throws RuntimeException if the process exits or the timeout elapses before the pattern is found
+     */
     public void waitForStartup(String pattern, Duration timeout) {
         log.info("Waiting for '{}' startup pattern '{}' (timeout: {})", name, pattern, timeout);
         long deadline = System.currentTimeMillis() + timeout.toMillis();
@@ -118,6 +126,7 @@ public class NativeProcessManager {
                 + pattern + "' after " + timeout + ". Output:\n" + logContent);
     }
 
+    /** Gracefully stop the process by destroying its process tree, waiting up to 30 seconds. */
     public void stop() {
         if (process == null || !process.isAlive()) {
             log.debug("Process '{}' is not running, nothing to stop", name);
@@ -143,6 +152,7 @@ public class NativeProcessManager {
         log.info("Process '{}' stopped", name);
     }
 
+    /** Forcibly destroy the process tree without waiting for graceful shutdown. */
     public void kill() {
         if (process == null || !process.isAlive()) {
             log.debug("Process '{}' is not running, nothing to kill", name);
@@ -162,6 +172,7 @@ public class NativeProcessManager {
         log.info("Process '{}' killed", name);
     }
 
+    /** Return {@code true} if the process has been started and is still alive. */
     public boolean isRunning() {
         return process != null && process.isAlive();
     }
@@ -170,6 +181,7 @@ public class NativeProcessManager {
         return outputLog;
     }
 
+    /** Read the merged stdout/stderr output log, returning an empty string if unavailable. */
     public String readOutputLog() {
         try {
             if (Files.exists(outputLog)) {
@@ -181,6 +193,14 @@ public class NativeProcessManager {
         return "";
     }
 
+    /**
+     * Execute a short-lived command synchronously and capture its output.
+     *
+     * @param workDir working directory for the process
+     * @param command the command and arguments to execute
+     * @return the captured exit code, stdout, and stderr
+     * @throws RuntimeException if the command times out
+     */
     public static CommandResult execCommand(Path workDir, String... command) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(command)
                 .directory(workDir.toFile());

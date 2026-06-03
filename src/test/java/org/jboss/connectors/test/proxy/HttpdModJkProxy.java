@@ -14,10 +14,12 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
 
     private final Path modJkPath;
 
+    /** Create a mod_jk proxy listening on the default httpd port. */
     public HttpdModJkProxy() {
         this(NativePortAllocator.HTTPD_PORT);
     }
 
+    /** Create a mod_jk proxy listening on the specified port. */
     public HttpdModJkProxy(int listenPort) {
         super(listenPort, "httpd-modjk-proxy");
         String path = System.getProperty("mod.jk.path");
