@@ -18,7 +18,7 @@ public class HttpdAjpProxy extends AbstractHttpdProxy {
     }
 
     @Override
-    protected StringBuilder buildBaseConfig(String workerHost, int workerAjpPort) {
+    protected StringBuilder buildBaseConfig(String workerHost, int workerAjpPort, String ajpSecret) {
         StringBuilder conf = buildCommonConfig();
 
         loadModules(conf,
@@ -33,7 +33,8 @@ public class HttpdAjpProxy extends AbstractHttpdProxy {
                 "auth_basic_module modules/mod_auth_basic.so",
                 "log_config_module modules/mod_log_config.so");
 
-        conf.append("ProxyPass /secured/ ajp://").append(workerHost).append(":").append(workerAjpPort).append("/secured/\n");
+        conf.append("ProxyPass /secured/ ajp://").append(workerHost).append(":").append(workerAjpPort)
+                .append("/secured/ secret=").append(ajpSecret).append("\n");
         conf.append("ProxyPassReverse /secured/ ajp://").append(workerHost).append(":").append(workerAjpPort).append("/secured/\n\n");
 
         return conf;

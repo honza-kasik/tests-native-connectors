@@ -50,9 +50,10 @@ public class IISIsapiProxy implements AjpProxy {
 
     /** {@inheritDoc} */
     @Override
-    public void configureAuth(String username, String password, String workerHost, int workerAjpPort) throws Exception {
+    public void configureAuth(String username, String password, String workerHost, int workerAjpPort,
+                               String ajpSecret) throws Exception {
         this.testUsername = username;
-        prepareIsapiDir(workerHost, workerAjpPort);
+        prepareIsapiDir(workerHost, workerAjpPort, ajpSecret);
 
         createWindowsUser(username, password);
 
@@ -62,8 +63,8 @@ public class IISIsapiProxy implements AjpProxy {
 
     /** {@inheritDoc} */
     @Override
-    public void configureNoAuth(String workerHost, int workerAjpPort) throws Exception {
-        prepareIsapiDir(workerHost, workerAjpPort);
+    public void configureNoAuth(String workerHost, int workerAjpPort, String ajpSecret) throws Exception {
+        prepareIsapiDir(workerHost, workerAjpPort, ajpSecret);
 
         setupIIS(false);
         log.info("Configured IIS ISAPI proxy without auth -> {}:{}", workerHost, workerAjpPort);
@@ -103,7 +104,7 @@ public class IISIsapiProxy implements AjpProxy {
         return "http://localhost";
     }
 
-    private void prepareIsapiDir(String workerHost, int workerAjpPort) throws IOException {
+    private void prepareIsapiDir(String workerHost, int workerAjpPort, String ajpSecret) throws IOException {
         Files.createDirectories(isapiDir);
         Files.copy(dllPath, isapiDir.resolve("isapi_redirect.dll"),
                 StandardCopyOption.REPLACE_EXISTING);
@@ -112,7 +113,8 @@ public class IISIsapiProxy implements AjpProxy {
                 "worker.list=worker1\n" +
                 "worker.worker1.type=ajp13\n" +
                 "worker.worker1.host=" + workerHost + "\n" +
-                "worker.worker1.port=" + workerAjpPort + "\n");
+                "worker.worker1.port=" + workerAjpPort + "\n" +
+                "worker.worker1.secret=" + ajpSecret + "\n");
 
         Files.writeString(isapiDir.resolve("uriworkermap.properties"),
                 "/secured/*=worker1\n");

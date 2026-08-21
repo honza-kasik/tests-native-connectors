@@ -46,16 +46,19 @@ public interface AjpProxy {
      * @param password the password for that user
      * @param workerHost the WildFly AJP listener host
      * @param workerAjpPort the WildFly AJP listener port
+     * @param ajpSecret the AJP secret shared with the WildFly listener
      */
-    void configureAuth(String username, String password, String workerHost, int workerAjpPort) throws Exception;
+    void configureAuth(String username, String password, String workerHost, int workerAjpPort,
+                        String ajpSecret) throws Exception;
 
     /**
      * Configure the proxy without authentication — no REMOTE_USER in AJP.
      *
      * @param workerHost the WildFly AJP listener host
      * @param workerAjpPort the WildFly AJP listener port
+     * @param ajpSecret the AJP secret shared with the WildFly listener
      */
-    void configureNoAuth(String workerHost, int workerAjpPort) throws Exception;
+    void configureNoAuth(String workerHost, int workerAjpPort, String ajpSecret) throws Exception;
 
     String getHttpUrl();
 

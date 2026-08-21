@@ -146,14 +146,6 @@ public class WildFlyWorker {
     /** Trigger a server reload via the management API and wait until the server is running again. */
     public void reload() throws Exception {
         log.info("Reloading worker '{}'", name);
-        if (managementClient != null) {
-            try {
-                managementClient.close();
-            } catch (IOException ignored) {
-            }
-            managementClient = null;
-        }
-
         try {
             getAdministration().reload();
         } catch (Exception e) {
@@ -161,7 +153,7 @@ public class WildFlyWorker {
                     || e.getCause() instanceof java.util.concurrent.TimeoutException
                     || (e.getMessage() != null && e.getMessage().contains("Waiting for server timed out"))) {
                 log.warn("Reload timed out for '{}', waiting with fresh connection", name);
-                managementClient = null;
+                closeManagementClient();
                 getAdministration().waitUntilRunning();
             } else {
                 throw e;

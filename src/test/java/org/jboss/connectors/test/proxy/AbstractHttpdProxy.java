@@ -33,17 +33,18 @@ abstract class AbstractHttpdProxy implements AjpProxy {
         this.workDir = Path.of("target", workDirName).toAbsolutePath();
     }
 
-    protected abstract StringBuilder buildBaseConfig(String workerHost, int workerAjpPort);
+    protected abstract StringBuilder buildBaseConfig(String workerHost, int workerAjpPort, String ajpSecret);
 
     /** {@inheritDoc} */
     @Override
-    public void configureAuth(String username, String password, String workerHost, int workerAjpPort) throws Exception {
+    public void configureAuth(String username, String password, String workerHost, int workerAjpPort,
+                               String ajpSecret) throws Exception {
         prepareWorkDir();
 
         Path htpasswdFile = confDir.resolve("test-users.htpasswd");
         createHtpasswd(htpasswdFile, username, password);
 
-        StringBuilder conf = buildBaseConfig(workerHost, workerAjpPort);
+        StringBuilder conf = buildBaseConfig(workerHost, workerAjpPort, ajpSecret);
         conf.append("<Location /secured>\n");
         conf.append("    AuthType Basic\n");
         conf.append("    AuthName \"Test\"\n");
@@ -59,10 +60,10 @@ abstract class AbstractHttpdProxy implements AjpProxy {
 
     /** {@inheritDoc} */
     @Override
-    public void configureNoAuth(String workerHost, int workerAjpPort) throws Exception {
+    public void configureNoAuth(String workerHost, int workerAjpPort, String ajpSecret) throws Exception {
         prepareWorkDir();
 
-        StringBuilder conf = buildBaseConfig(workerHost, workerAjpPort);
+        StringBuilder conf = buildBaseConfig(workerHost, workerAjpPort, ajpSecret);
         writeConfig(conf.toString());
         log.info("Configured {} without auth -> {}:{}",
                 getClass().getSimpleName(), workerHost, workerAjpPort);

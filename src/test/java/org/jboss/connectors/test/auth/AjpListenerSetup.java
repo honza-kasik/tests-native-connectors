@@ -5,9 +5,9 @@ import org.jboss.connectors.test.utils.WildFlyWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.wildfly.extras.creaper.commands.socketbindings.AddSocketBinding;
-import org.wildfly.extras.creaper.commands.undertow.AddUndertowListener;
 import org.wildfly.extras.creaper.core.online.operations.Address;
 import org.wildfly.extras.creaper.core.online.operations.Operations;
+import org.wildfly.extras.creaper.core.online.operations.Values;
 
 /**
  * Adds an AJP listener to a WildFly worker.
@@ -21,6 +21,7 @@ final class AjpListenerSetup {
     private static final int AJP_PORT = 8019;
     private static final String AJP_SOCKET_BINDING = "ajp-test";
     private static final String AJP_LISTENER = "ajp-test-listener";
+    static final String AJP_SECRET = "test-ajp-secret";
 
     private AjpListenerSetup() {
     }
@@ -40,12 +41,17 @@ final class AjpListenerSetup {
                     new AddSocketBinding.Builder(AJP_SOCKET_BINDING).port(AJP_PORT).build());
         }
 
+        Address secretProp = Address.of("system-property", "io.undertow.ajp.AJP_SECRET");
+        if (!ops.exists(secretProp)) {
+            ops.add(secretProp, Values.of("value", AJP_SECRET)).assertSuccess();
+            worker.reload();
+        }
+
         Address listenerAddr = Address.subsystem("undertow")
                 .and("server", "default-server")
                 .and("ajp-listener", AJP_LISTENER);
         if (!ops.exists(listenerAddr)) {
-            worker.getManagementClient().apply(
-                    new AddUndertowListener.AjpBuilder(AJP_LISTENER, "default-server", AJP_SOCKET_BINDING).build());
+            ops.add(listenerAddr, Values.of("socket-binding", AJP_SOCKET_BINDING)).assertSuccess();
             worker.reload();
         }
 
