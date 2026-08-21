@@ -33,7 +33,7 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
     }
 
     @Override
-    protected StringBuilder buildBaseConfig(String workerHost, int workerAjpPort) {
+    protected StringBuilder buildBaseConfig(String workerHost, int workerAjpPort, String ajpSecret) {
         StringBuilder conf = buildCommonConfig();
 
         loadModules(conf,
@@ -49,7 +49,7 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
         conf.append("LoadModule jk_module \"").append(modJkPath.toAbsolutePath()).append("\"\n\n");
 
         try {
-            writeWorkersProperties(workerHost, workerAjpPort);
+            writeWorkersProperties(workerHost, workerAjpPort, ajpSecret);
             writeUriWorkerMap();
         } catch (IOException e) {
             throw new RuntimeException("Failed to write mod_jk config files", e);
@@ -63,14 +63,15 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
         return conf;
     }
 
-    private void writeWorkersProperties(String workerHost, int workerAjpPort) throws IOException {
+    private void writeWorkersProperties(String workerHost, int workerAjpPort, String ajpSecret) throws IOException {
         // mod_jk resolves "localhost" to IPv6 (::1) on dual-stack systems,
         // but WildFly binds to 0.0.0.0 (IPv4 only). Force IPv4.
         String host = "localhost".equals(workerHost) ? "127.0.0.1" : workerHost;
         String content = "worker.list=worker1\n" +
                 "worker.worker1.type=ajp13\n" +
                 "worker.worker1.host=" + host + "\n" +
-                "worker.worker1.port=" + workerAjpPort + "\n";
+                "worker.worker1.port=" + workerAjpPort + "\n" +
+                "worker.worker1.secret=" + ajpSecret + "\n";
         Files.writeString(confDir.resolve("workers.properties"), content);
     }
 

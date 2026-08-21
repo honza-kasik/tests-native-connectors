@@ -46,7 +46,7 @@ public class AjpAuthPropagationTest {
         File securedWar = SecuredAppBuilder.createSecuredApp();
         worker.deploy(securedWar);
 
-        proxy.configureAuth("testuser", "Password1!", "localhost", ajpPort);
+        proxy.configureAuth("testuser", "Password1!", "localhost", ajpPort, AjpListenerSetup.AJP_SECRET);
         proxy.start();
 
         String url = proxy.getHttpUrl() + "/secured/secured";
@@ -76,7 +76,7 @@ public class AjpAuthPropagationTest {
         File securedWar = SecuredAppBuilder.createSecuredApp();
         worker.deploy(securedWar);
 
-        proxy.configureNoAuth("localhost", ajpPort);
+        proxy.configureNoAuth("localhost", ajpPort, AjpListenerSetup.AJP_SECRET);
         proxy.start();
 
         String url = proxy.getHttpUrl() + "/secured/secured";
@@ -105,7 +105,7 @@ public class AjpAuthPropagationTest {
         File securedWar = SecuredAppBuilder.createSecuredApp();
         worker.deploy(securedWar);
 
-        proxy.configureAuth("baduser", "Password1!", "localhost", ajpPort);
+        proxy.configureAuth("baduser", "Password1!", "localhost", ajpPort, AjpListenerSetup.AJP_SECRET);
         proxy.start();
 
         String url = proxy.getHttpUrl() + "/secured/secured";
