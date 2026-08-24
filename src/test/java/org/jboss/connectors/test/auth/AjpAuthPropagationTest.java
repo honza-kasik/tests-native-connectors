@@ -3,9 +3,11 @@ package org.jboss.connectors.test.auth;
 import org.jboss.connectors.test.apps.SecuredAppBuilder;
 import org.jboss.connectors.test.base.ConnectorTestExtension;
 import org.jboss.connectors.test.proxy.AjpProxy;
+import org.jboss.connectors.test.proxy.HttpdAjpProxy;
 import org.jboss.connectors.test.utils.HttpClient;
 import org.jboss.connectors.test.utils.HttpClient.HttpResponse;
 import org.jboss.connectors.test.utils.WildFlyWorker;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
@@ -116,6 +118,47 @@ public class AjpAuthPropagationTest {
 
         log.info("Response (wrong role): status={}", response.getStatusCode());
         assertThat(response.getStatusCode()).isEqualTo(403);
+    }
+
+    /**
+     * Verifies that AJP auth propagation works when CPING health checks are
+     * enabled on the proxy ({@code ping=10} in mod_proxy_ajp).
+     *
+     * <p>Disabled due to <a href="https://issues.redhat.com/browse/UNDERTOW-2791">
+     * UNDERTOW-2791</a>: the secret check in {@code AjpReadListener} runs before
+     * the packet-type dispatch, so CPING packets (which carry no secret attribute)
+     * are rejected with 403 before {@code handleCPing()} is reached.</p>
+     */
+    @Disabled("UNDERTOW-2791: AJP secret check rejects CPING health checks")
+    @Test
+    public void testAuthWithCpingEnabled(WildFlyWorker worker,
+                                         HttpClient httpClient) throws Exception {
+        AjpAuthConfigurator configurator = new AjpAuthConfigurator();
+        configurator.configureElytron(worker,
+                new AjpAuthConfigurator.UserEntry("testuser", "gooduser"));
+        int ajpPort = AjpListenerSetup.addAjpListener(worker);
+
+        File securedWar = SecuredAppBuilder.createSecuredApp();
+        worker.deploy(securedWar);
+
+        HttpdAjpProxy proxy = new HttpdAjpProxy();
+        proxy.withCping();
+        proxy.configureAuth("testuser", "Password1!", "localhost", ajpPort, AjpListenerSetup.AJP_SECRET);
+        proxy.start();
+
+        try {
+            String url = proxy.getHttpUrl() + "/secured/secured";
+            Map<String, String> authHeaders = basicAuthHeaders("testuser", "Password1!");
+            awaitAjpAvailable(httpClient, url, authHeaders);
+
+            HttpResponse response = httpClient.get(url, authHeaders);
+
+            log.info("Response (cping): status={}, body={}", response.getStatusCode(), response.getBody());
+            assertThat(response.getStatusCode()).isEqualTo(200);
+            assertThat(response.getBody()).contains("user=testuser");
+        } finally {
+            proxy.stop();
+        }
     }
 
 }
