@@ -7,6 +7,8 @@ import org.jboss.connectors.test.utils.NativePortAllocator;
  */
 public class HttpdAjpProxy extends AbstractHttpdProxy {
 
+    private boolean cpingEnabled;
+
     /** Create a mod_proxy_ajp proxy listening on the default httpd port. */
     public HttpdAjpProxy() {
         this(NativePortAllocator.HTTPD_PORT);
@@ -15,6 +17,12 @@ public class HttpdAjpProxy extends AbstractHttpdProxy {
     /** Create a mod_proxy_ajp proxy listening on the specified port. */
     public HttpdAjpProxy(int listenPort) {
         super(listenPort, "httpd-proxy");
+    }
+
+    /** Enable CPING health checks on the AJP connection (ping=10). */
+    public HttpdAjpProxy withCping() {
+        this.cpingEnabled = true;
+        return this;
     }
 
     @Override
@@ -34,7 +42,11 @@ public class HttpdAjpProxy extends AbstractHttpdProxy {
                 "log_config_module modules/mod_log_config.so");
 
         conf.append("ProxyPass /secured/ ajp://").append(workerHost).append(":").append(workerAjpPort)
-                .append("/secured/ secret=").append(ajpSecret).append("\n");
+                .append("/secured/ secret=").append(ajpSecret);
+        if (cpingEnabled) {
+            conf.append(" ping=10");
+        }
+        conf.append("\n");
         conf.append("ProxyPassReverse /secured/ ajp://").append(workerHost).append(":").append(workerAjpPort).append("/secured/\n\n");
 
         return conf;
