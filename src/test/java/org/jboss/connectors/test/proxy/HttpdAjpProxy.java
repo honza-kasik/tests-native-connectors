@@ -19,7 +19,7 @@ public class HttpdAjpProxy extends AbstractHttpdProxy {
         super(listenPort, "httpd-proxy");
     }
 
-    /** Enable CPING health checks on the AJP connection (ping=10). */
+    @Override
     public HttpdAjpProxy withCping() {
         this.cpingEnabled = true;
         return this;

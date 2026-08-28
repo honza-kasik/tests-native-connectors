@@ -38,6 +38,7 @@ public class IISIsapiProxy implements AjpProxy {
     private final Path dllPath;
 
     private String testUsername;
+    private boolean cpingEnabled;
     private boolean started;
 
     /**
@@ -100,6 +101,12 @@ public class IISIsapiProxy implements AjpProxy {
     }
 
     @Override
+    public IISIsapiProxy withCping() {
+        this.cpingEnabled = true;
+        return this;
+    }
+
+    @Override
     public String getHttpUrl() {
         return "http://localhost";
     }
@@ -109,12 +116,15 @@ public class IISIsapiProxy implements AjpProxy {
         Files.copy(dllPath, isapiDir.resolve("isapi_redirect.dll"),
                 StandardCopyOption.REPLACE_EXISTING);
 
-        Files.writeString(isapiDir.resolve("workers.properties"),
-                "worker.list=worker1\n" +
+        String workerProps = "worker.list=worker1\n" +
                 "worker.worker1.type=ajp13\n" +
                 "worker.worker1.host=" + workerHost + "\n" +
                 "worker.worker1.port=" + workerAjpPort + "\n" +
-                "worker.worker1.secret=" + ajpSecret + "\n");
+                "worker.worker1.secret=" + ajpSecret + "\n";
+        if (cpingEnabled) {
+            workerProps += "worker.worker1.ping_mode=A\n";
+        }
+        Files.writeString(isapiDir.resolve("workers.properties"), workerProps);
 
         Files.writeString(isapiDir.resolve("uriworkermap.properties"),
                 "/secured/*=worker1\n");
