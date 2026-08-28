@@ -13,6 +13,7 @@ import java.nio.file.Path;
 public class HttpdModJkProxy extends AbstractHttpdProxy {
 
     private final Path modJkPath;
+    private boolean cpingEnabled;
 
     /** Create a mod_jk proxy listening on the default httpd port. */
     public HttpdModJkProxy() {
@@ -30,6 +31,12 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
         if (!modJkPath.toFile().exists()) {
             throw new IllegalStateException("mod_jk.so not found at: " + modJkPath);
         }
+    }
+
+    @Override
+    public HttpdModJkProxy withCping() {
+        this.cpingEnabled = true;
+        return this;
     }
 
     @Override
@@ -72,6 +79,9 @@ public class HttpdModJkProxy extends AbstractHttpdProxy {
                 "worker.worker1.host=" + host + "\n" +
                 "worker.worker1.port=" + workerAjpPort + "\n" +
                 "worker.worker1.secret=" + ajpSecret + "\n";
+        if (cpingEnabled) {
+            content += "worker.worker1.ping_mode=A\n";
+        }
         Files.writeString(confDir.resolve("workers.properties"), content);
     }
 

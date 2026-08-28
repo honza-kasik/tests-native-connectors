@@ -3,7 +3,6 @@ package org.jboss.connectors.test.auth;
 import org.jboss.connectors.test.apps.SecuredAppBuilder;
 import org.jboss.connectors.test.base.ConnectorTestExtension;
 import org.jboss.connectors.test.proxy.AjpProxy;
-import org.jboss.connectors.test.proxy.HttpdAjpProxy;
 import org.jboss.connectors.test.utils.HttpClient;
 import org.jboss.connectors.test.utils.HttpClient.HttpResponse;
 import org.jboss.connectors.test.utils.WildFlyWorker;
@@ -131,6 +130,7 @@ public class AjpAuthPropagationTest {
      */
     @Test
     public void testAuthWithCpingEnabled(WildFlyWorker worker,
+                                         AjpProxy proxy,
                                          HttpClient httpClient) throws Exception {
         AjpAuthConfigurator configurator = new AjpAuthConfigurator();
         configurator.configureElytron(worker,
@@ -140,24 +140,19 @@ public class AjpAuthPropagationTest {
         File securedWar = SecuredAppBuilder.createSecuredApp();
         worker.deploy(securedWar);
 
-        HttpdAjpProxy proxy = new HttpdAjpProxy();
         proxy.withCping();
         proxy.configureAuth("testuser", "Password1!", "localhost", ajpPort, AjpListenerSetup.AJP_SECRET);
         proxy.start();
 
-        try {
-            String url = proxy.getHttpUrl() + "/secured/secured";
-            Map<String, String> authHeaders = basicAuthHeaders("testuser", "Password1!");
-            awaitAjpAvailable(httpClient, url, authHeaders);
+        String url = proxy.getHttpUrl() + "/secured/secured";
+        Map<String, String> authHeaders = basicAuthHeaders("testuser", "Password1!");
+        awaitAjpAvailable(httpClient, url, authHeaders);
 
-            HttpResponse response = httpClient.get(url, authHeaders);
+        HttpResponse response = httpClient.get(url, authHeaders);
 
-            log.info("Response (cping): status={}, body={}", response.getStatusCode(), response.getBody());
-            assertThat(response.getStatusCode()).isEqualTo(200);
-            assertThat(response.getBody()).contains("user=testuser");
-        } finally {
-            proxy.stop();
-        }
+        log.info("Response (cping): status={}, body={}", response.getStatusCode(), response.getBody());
+        assertThat(response.getStatusCode()).isEqualTo(200);
+        assertThat(response.getBody()).contains("user=testuser");
     }
 
 }

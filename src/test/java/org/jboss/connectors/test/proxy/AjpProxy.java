@@ -60,6 +60,13 @@ public interface AjpProxy {
      */
     void configureNoAuth(String workerHost, int workerAjpPort, String ajpSecret) throws Exception;
 
+    /**
+     * Enable CPING health checks on the AJP connection.
+     * The exact mechanism depends on the proxy implementation
+     * (e.g. {@code ping=} on mod_proxy_ajp, {@code ping_mode} on mod_jk/ISAPI).
+     */
+    AjpProxy withCping();
+
     String getHttpUrl();
 
     /** Archive proxy configuration files to the given directory for post-test debugging. */
