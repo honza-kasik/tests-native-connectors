@@ -129,7 +129,6 @@ public class AjpAuthPropagationTest {
      * the packet-type dispatch, so CPING packets (which carry no secret attribute)
      * are rejected with 403 before {@code handleCPing()} is reached.</p>
      */
-    @Disabled("UNDERTOW-2791: AJP secret check rejects CPING health checks")
     @Test
     public void testAuthWithCpingEnabled(WildFlyWorker worker,
                                          HttpClient httpClient) throws Exception {
